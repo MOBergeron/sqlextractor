@@ -103,6 +103,9 @@ def userInputs(kwargs):
     # minAscii and maxAscii are INCLUSIVE. Meaning that your payload must use GREATER THAN {ascii}.
     kwargs["minAscii"] = 32
     kwargs["maxAscii"] = 126
+
+    # Amount of bits to read from a binary search. 7 if you search for only printables (lower than 128), 8 if your charset is bigger than 127.
+    kwargs["binaryLength"] = 7
     
     # True if you want to use binary instead of ASCII (False)
     kwargs["useBinary"] = False
@@ -376,7 +379,7 @@ class SQLPlease(object):
                     # Delete back the keyword findLength.
                     del self.findLength
 
-                self.payload = originalPayload.format(charIndex="{charIndex}", bitIndex="{bitIndex}", offsetIndex=offsetIndex, max="{max}") if self.useBinary else originalPayload.format(charIndex="{charIndex}", ascii="{ascii}", offsetIndex=offsetIndex, max="{max}")
+                self.payload = originalPayload.format(charIndex="{charIndex}", bitIndex="{bitIndex}", offsetIndex=offsetIndex) if self.useBinary else originalPayload.format(charIndex="{charIndex}", ascii="{ascii}", offsetIndex=offsetIndex, max="{max}")
 
                 if(self.useBinary):
                     answer = self.injectionBinary(*args, **kwargs)
@@ -522,7 +525,7 @@ class SQLPlease(object):
                     binary += "0"
 
                 Logger().debug("Found {}".format(binary[::-1]))
-                if(bitIndex == 8):
+                if(bitIndex == self.binaryLength):
                     char = int(binary[::-1],2)
                     if("findLength" in self.__dict__ or "countRows" in self.__dict__): 
                         Logger().debug("Found {} in {} requests".format(char, amountOfRequests))

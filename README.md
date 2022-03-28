@@ -40,3 +40,10 @@ Then, modify the newly created file to setup your configurations and then execut
 ```
 python3 sqlextractor.py configurations/20220328112628.py
 ```
+
+## TODO
+
+* Save state to continue where the script ended.
+* Improving length and count queries as they are not efficient and uses more requests than letting the script finding a null byte.
+* Make it possible to provide an HTTP request in a file and parse it.
+* Add fine tuning for indexes. Example, a DBMS that starts at 1 instead of 0. (substring, offset)

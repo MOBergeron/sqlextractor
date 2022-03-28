@@ -3,11 +3,6 @@
     IMPORTANT NOTE:
         Unless you know what you are doing, do not edit this script.
 """
-# TODO:
-#   Make it possible to provide a request in a file, parse that request and use it for cookies, headers, etc.
-#   Save state from a log file. With an argument, use the last file to continue the injection according to the command line and last results found in the file.
-#   Right now, a length or count of more than 128 is not possible. However, it takes more requests to find a bigger length/count than actually do 7 requests that give a null byte in the end. Therefore, make it either that the length/count is only available for ASCII search or find a better/faster algorithm.
-#
 
 import os
 import sys
@@ -65,7 +60,7 @@ def main():
                 checksum = md5(f.read()).hexdigest()
                 f.close()
 
-            if(checksum == "94ec56403ac7d8b9f1baa01af740f494"):
+            if(checksum == "67de3ea0b96684ad1c2fda8134819f96"):
                 from shutil import copyfile
                 from datetime import datetime
                 newConfigurationFile = os.path.join("configurations", '{0:%Y%m%d%H%M%S}'.format(datetime.now()) + ".py")
@@ -258,9 +253,9 @@ class SQLPlease(object):
 
         return data
 
-    def doInjection(self, *args, **kwargs):
+    def doInjection(self):
         self.__time = time.time()
-        answers = []
+        answers = self.continueFromAnswers
         offsetIndex = len(answers)
 
         originalPayload = self.payload
@@ -286,10 +281,10 @@ class SQLPlease(object):
 
                     # Keep the count variable for this loop, no need to put it in the kwargs.
                     if(self.useBinary):
-                        count = self.injectionBinary(*args, **kwargs)
+                        count = self.injectionBinary()
                     else:
 
-                        count = self.injectionAscii(*args, **kwargs)
+                        count = self.injectionAscii()
                     
                     Logger().info("Counted {} rows".format(count))
                     
@@ -303,9 +298,9 @@ class SQLPlease(object):
 
                     # Set the length in the kwards so the function knows that it is useless to extract a final character equal to a null byte.
                     if(self.useBinary):
-                        self.length = self.injectionBinary(*args, **kwargs)
+                        self.length = self.injectionBinary()
                     else:
-                        self.length = self.injectionAscii(*args, **kwargs)
+                        self.length = self.injectionAscii()
 
                     if(self.length == ""):
                         Logger().warning("Find length failed, continue the execution without finding length.".format(self.length))
@@ -320,9 +315,9 @@ class SQLPlease(object):
                 self.payload = originalPayload.format(charIndex="{charIndex}", bitIndex="{bitIndex}", offsetIndex=offsetIndex) if self.useBinary else originalPayload.format(charIndex="{charIndex}", ascii="{ascii}", offsetIndex=offsetIndex, max="{max}")
 
                 if(self.useBinary):
-                    answer = self.injectionBinary(*args, **kwargs)
+                    answer = self.injectionBinary()
                 else:
-                    answer = self.injectionAscii(*args, **kwargs)
+                    answer = self.injectionAscii()
 
                 if(answer == ""):
                     break
@@ -347,7 +342,7 @@ class SQLPlease(object):
             Logger().info("Finished {} requests".format(self.__amountOfRequests))
             Logger().info("Elasped time: {}".format(time.time() - self.__time))
 
-    def injectionAscii(self, *args, **kwargs):
+    def injectionAscii(self):
         MIN = self.minAscii
         MAX = self.maxAscii
 
@@ -422,7 +417,7 @@ class SQLPlease(object):
         except Exception as e:
             raise e
 
-    def injectionBinary(self, *args, **kwargs):
+    def injectionBinary(self):
         binary = ""
         bitIndex = len(binary)+1
         

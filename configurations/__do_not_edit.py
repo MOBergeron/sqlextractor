@@ -1,6 +1,9 @@
 #Version 2022-03-28
 class Configuration(dict):
     def __init__(self):
+        ######################################
+        # Parameters related to the payload. #
+        ######################################
         """ Payload requires some attributes in order for it to work.
                 Both:
                     {charIndex}:
@@ -31,13 +34,32 @@ class Configuration(dict):
                 Example: `data = {"id":"{payload}"}`
         """
         self.payload = ""
+
+        """
+            Important note:
+                Use only if necessary.
+            If you want to count the number of rows prior extracting them, use the following parameter. However, it may not work properly and increase the duration of the script.
+                Example: `(select count(table_name) from information_schema.tables)>{ascii}`
+        """
+        self.countRows = "" 
         
+        """
+            Important note:
+                Use only if necessary.
+            If you want to find the length of the word to extract prior extracting it, use the following parameter. However, it may not work properly and increase the duration of the script.
+                Example: `(select length(@@version))>{ascii}`
+        """
+        self.findLength = "" 
+        
+        ##################################################
+        # Parameters related to the HTTP request itself. #
+        ##################################################
+
+        # URL. Example: `http://127.0.0.1/?id={payload}`
+        self.url = ""
+
         # Request Method (handles what the module requests can handle).
         self.method = "get".lower()
-
-        # URL
-        # Example: `http://127.0.0.1/?id={payload}`
-        self.url = ""
 
         """
             POST data in many format.
@@ -49,23 +71,21 @@ class Configuration(dict):
         self.data = {}
 
         """
+            Important note:
+                This parameter is only used to determine which parameter to use for the requests call (data, json or files). 
+                It is not sent has an header. 
+                Use the parameter `self.requests["headers"]` instead for that.
+
             - JSON: [application/json or json]
             - Multipart/form-data: [multipart/form-data or multipart or form-data].
-            - XML: If you need XML, you must add the header for it and keep this variable empty. Example: `kwargs["requests"]["headers"] = {"Content-Type":"application/xml"}`.
+            - XML: If you need XML, you must add the header for it and keep this parameter empty. Example: `self.requests["headers"] = {"Content-Type":"application/xml"}`.
             - Empty or anything else reverts to application/x-www-form-urlencoded.
-            
-            Important note:
-                This variable is only used to determine which parameter to use for the requests call (data, json or files). It is not sent has an header.
         """
         self.contentType = ""
 
-        # If you want to count the number of rows prior extracting them, use the following parameter. However, it may not work properly and increase the duration of the script.
-        # Example: `(select count(table_name) from information_schema.tables)>{ascii}`
-        self.countRows = "" 
-        
-        # If you want to find the length of the word to extract prior extracting it, use the following parameter. However, it may not work properly and increase the duration of the script.
-        # Example: `(select length(@@version))>{ascii}`
-        self.findLength = "" 
+        ####################################################
+        # Parameters related to ASCII or binary injection. #
+        ####################################################
 
         # minAscii and maxAscii are INCLUSIVE. Meaning that your payload must use GREATER THAN {ascii}.
         self.minAscii = 32
@@ -77,23 +97,50 @@ class Configuration(dict):
         # True if you want to use binary instead of ASCII (False)
         self.useBinary = False
 
+        ################################################
+        # Parameters related to time or boolean based. #
+        ################################################
+
+        """
+            Use only if you want to use time-based. The number is the amount of seconds for the request to be TRUE.
+                The parameter will be evaluated as such:
+                    `condition = r.elapsed.total_seconds() > self.timeBased`
+
+            If using boolean-based, keep this parameter to default (0).
+        """
+        self.timeBased = 0
+
+        """
+            Use only if you want to use boolean-based. The value of the parameter will be evaluated in order to know if it is TRUE where `r` is the object containing the result of the requests.
+                Example: `"Found" in r.text` 
+                Example: `1 == r.json()["results"][0]["id"]`
+
+            If `timeBased` is not set to default (0), this parameter will not trigger.
+        """
+        self.evalCondition = ""
+
+        ###########################
+        # Fine tuning parameters. #
+        ###########################
+
         # Sleep in second between each request. This is mostly used to slow down the script.
         self.sleep = 0
 
-        # The following parameter is used if you want to use boolean. The value of the parameter will be evaluated in order to know if it is true where `r` is the object containing the result of the requests.
-        # Example: `"Found" in r.text` 
-        # Example: `1 == r.json()["results"][0]["id"]`
-        self.evalCondition = ""
-        
-        # True if you want to use time instead of boolean (False)
-        self.timeBased = False
+        # If you already extracted some data, add it here. Example: `["table1","table2"]`
+        self.continueFromAnswers = []
 
-        # Requests parameters.
-        #   verify: validate SSL/TLS certificates.
-        #   allow_redirects: follow HTTP status 302.
-        #   proxies: Example: `{"http":"http://127.0.0.1:8080","https":"http://127.0.0.1:8080"}`
-        #
-        #   For more information, https://docs.python-requests.org/en/latest/.
+        ###############################
+        # Requests module parameters. #
+        ###############################
+
+        """
+            verify: validate SSL/TLS connection.
+            allow_redirects: follow HTTP redirections.
+            proxies: Example: `{"http":"http://127.0.0.1:8080","https":"http://127.0.0.1:8080"}`
+        
+            Use Burp Extender `Copy As Python-Requests` to make your life easier for headers and cookies.
+            For more information, https://docs.python-requests.org/en/latest/.
+        """
         self.requests = {}
         self.requests["verify"] = False
         self.requests["allow_redirects"] = False
@@ -102,9 +149,9 @@ class Configuration(dict):
         self.requests["proxies"] = {}
 
 
-    ################################
-    # Default dictionary functions #
-    ################################
+    ##############################################
+    # Default dictionary functions - do not edit #
+    ##############################################
 
     def __setitem__(self, key, item):
         self.__dict__[key] = item

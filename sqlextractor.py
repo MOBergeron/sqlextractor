@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
     IMPORTANT NOTE:
-        Unless you know what you are doing, do not edit this script except for the variable `kwargs` in the main.
+        Unless you know what you are doing, do not edit this script.
 """
 # TODO:
 #   Make it possible to provide a request in a file, parse that request and use it for cookies, headers, etc.
@@ -33,127 +33,66 @@ LOGGING_LEVEL = {
     "critical" : CRITICAL,
 }
 
-def userInputs(kwargs):
-    """ Payload requires some attributes in order for it to work.
-            Both:
-                {charIndex}:
-                    Mandatory. Character index of a string. Example: `SUBSTRING(...,{charIndex},1)`
-                {offsetIndex}:
-                    Mandatory. Offset of the row. Example: `LIMIT {offsetIndex}, 1`
+def getConfiguration(configFile):
+    import importlib.util
 
-            ASCII:
-                {ascii}:
-                    Mandatory. Minimum inclusive ASCII value. 32 if printable only, else 0. Example: `ASCII(...)>={ascii}`
-                {max}:
-                    Optional. Maximum inclusive ASCII value. 126 if printable only, else 255. Example: `ASCII(...) BETWEEN {ascii} AND {max}`
+    moduleName = os.path.basename(configFile)
+    spec = importlib.util.spec_from_file_location(moduleName, configFile)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[moduleName] = module
+    spec.loader.exec_module(module)
 
-                Example: 
-                    With multiple rows: `ASCII(SUBSTRING((SELECT table_name FROM information_schema.tables LIMIT {offsetIndex},1),{charIndex},1))>={ascii}`
-                    With one row:       `ASCII(SUBSTRING((SELECT @@version),{charIndex},1))>={ascii}`
+    configuration = module.Configuration()
 
-            Binary:
-                {bitIndex}:
-                    Mandatory. Bit index of a character. Example: `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING(...)))),{bitIndex},1)=1`
-
-                Example: 
-                    With mulitple rows: `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING((SELECT table_name FROM information_schema.tables LIMIT {offsetIndex},1),{charIndex},1)))),{bitIndex},1)=1`
-                    With one row:       `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING((SELECT @@version),{charIndex},1)))),{bitIndex},1)=1`
-
-        To know where to inject the payload, the URL or the data must contain the keywork {payload}.
-            Example: `url = http://127.0.0.1/?id={payload}`
-            Example: `data = {"id":"{payload}"}`
-    """
-    kwargs["payload"] = ""
-    
-    # Request Method (handles what the module requests can handle).
-    kwargs["method"] = "get".lower()
-
-    # URL
-    # Example: `http://127.0.0.1/?id={payload}`
-    kwargs["url"] = ""
-
-    """
-        POST data in many format.
-            URL encoded: `{"id":"{payload}"}`
-            JSON: `{"queries":[{"id":"{payload}"}]}`
-            XML: `"<element>{payload}</element>"`
-            Multipart/form-data: `{"parameterName":("fileName","{payload}")}` or `{"parameterName":(None,"{payload}")}` or `{"parameterName":"{payload}"}`
-    """
-    kwargs["data"] = {}
-
-    """
-        - JSON: [application/json or json]
-        - Multipart/form-data: [multipart/form-data or multipart or form-data].
-        - XML: If you need XML, you must add the header for it and keep this variable empty. Example: `kwargs["requests"]["headers"] = {"Content-Type":"application/xml"}`.
-        - Empty or anything else reverts to application/x-www-form-urlencoded.
-        
-        Important note:
-            This variable is only used to determine which parameter to use for the requests call (data, json or files). It is not sent has an header.
-    """
-    kwargs["contentType"] = ""
-
-    # If you want to count the number of rows prior extracting them, use the following parameter. However, it may not work properly and increase the duration of the script.
-    # Example: `(select count(table_name) from information_schema.tables)>{ascii}`
-    kwargs["countRows"] = "" 
-    
-    # If you want to find the length of the word to extract prior extracting it, use the following parameter. However, it may not work properly and increase the duration of the script.
-    # Example: `(select length(@@version))>{ascii}`
-    kwargs["findLength"] = "" 
-
-    # minAscii and maxAscii are INCLUSIVE. Meaning that your payload must use GREATER THAN {ascii}.
-    kwargs["minAscii"] = 32
-    kwargs["maxAscii"] = 126
-
-    # Amount of bits to read from a binary search. 7 if you search for only printables (lower than 128), 8 if your charset is bigger than 127.
-    kwargs["binaryLength"] = 7
-    
-    # True if you want to use binary instead of ASCII (False)
-    kwargs["useBinary"] = False
-
-    # Sleep in second between each request. This is mostly used to slow down the script.
-    kwargs["sleep"] = 0
-
-
-    # The following parameter is used if you want to use boolean. The value of the parameter will be evaluated in order to know if it is true where `r` is the object containing the result of the requests.
-    # Example: `"Found" in r.text` 
-    # Example: `1 == r.json()["results"][0]["id"]`
-    kwargs["evalCondition"] = ""
-    
-    # True if you want to use time instead of boolean (False)
-    kwargs["timeBased"] = False
-
-    # Requests parameters.
-    #   verify: validate SSL/TLS certificates.
-    #   allow_redirects: follow HTTP status 302.
-    #   proxies: Example: `{"http":"http://127.0.0.1:8080","https":"http://127.0.0.1:8080"}`
-    #
-    #   For more information, https://docs.python-requests.org/en/latest/.
-    kwargs["requests"]["verify"] = False
-    kwargs["requests"]["allow_redirects"] = False
-    kwargs["requests"]["cookies"] = {}
-    kwargs["requests"]["headers"] = {}
-    kwargs["requests"]["proxies"] = {}
+    return configuration
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--request", dest="request", help="File containing an HTTP request to set the URL, method, data, cookies and headers. Don't forget to setup the {payload} and etc.", type=str)
+    parser.add_argument(metavar="config-file", dest="configFile", nargs='?', help="Configuration file containing all the user inputs necessary to execute this script.", type=str)
+    #parser.add_argument("-r", "--request", dest="request", help="File containing an HTTP request to set the URL, method, data, cookies and headers. Don't forget to setup the {payload} and etc.", type=str)
     loggingParser = parser.add_argument_group("logging arguments")
     loggingParser.add_argument("-o", "--output", dest="directory", help="Directory where to put the logging file (default is 'results'.)", default="results", type=str)
     loggingParser.add_argument("-l", "--logging-level", dest="loggingLevel", help="Default warning", choices=["debug","info","warning","error","critical"], default="info", type=str)
-    loggingParser.add_argument("-c", "--useColor", dest="useColor", help="Use color for the logging in console.", action="store_true")
+    loggingParser.add_argument("-C", "--useColor", dest="useColor", help="Use color for the logging in console.", action="store_true")
 
     args = parser.parse_args()
+
+    if(args.configFile is None):
+        defaultConfigFilePath = os.path.join("configurations", "__do_not_edit.py")
+        if(os.path.exists(defaultConfigFilePath)):
+            from hashlib import md5
+            with open(defaultConfigFilePath, 'rb') as f:
+                checksum = md5(f.read()).hexdigest()
+                f.close()
+
+            if(checksum == "94ec56403ac7d8b9f1baa01af740f494"):
+                from shutil import copyfile
+                from datetime import datetime
+                newConfigurationFile = os.path.join("configurations", '{0:%Y%m%d%H%M%S}'.format(datetime.now()) + ".py")
+                try:
+                    copyfile(defaultConfigFilePath, newConfigurationFile)
+                    print("New configuration file created: {}".format(newConfigurationFile))
+                    print("Setup your configuration and then use:")
+                    print("\tpython3 sqlextractor.py {}".format(newConfigurationFile))
+                    sys.exit(0)
+                except Exception as e:
+                    print("Failed to copy: {}".format(e))
+                    sys.exit(1)
+            else:
+                print("The default configuration file has been edited, revert changes or update the project to latest version.")
+                sys.exit(1)
+        else:
+            print("You are missing a default file. Update the project to latest version.")
+            sys.exit(1)
+    elif(not os.path.exists(args.configFile)):
+        print("File does not exist: {}".format(args.configFile))
+        sys.exit(0)
     
     directory = args.directory
     loggingLevel = args.loggingLevel
     useColor = args.useColor
 
-    kwargs = {"requests":{}}
-    userInputs(kwargs)
-
-    ####################################################################
-    # Unless you know what you are doing, do not edit past this point. #
-    ####################################################################
+    configuration = getConfiguration(args.configFile)
 
     # If the variable directory is not set, the logs will be stored in ./results/
     if(not directory):
@@ -173,12 +112,12 @@ def main():
         Logger().updateStreamLevel(LOGGING_LEVEL["info"])
 
     # If the keyword {payload} is not found in URL or DATA, stop the script.
-    if(not "{payload}" in kwargs["url"] and (not kwargs["data"] or not "{payload}" in json.dumps(kwargs["data"]))):
+    if(not "{payload}" in configuration["url"] and (not configuration["data"] or not "{payload}" in json.dumps(configuration["data"]))):
         Logger().error("Use the keyword {payload} (case sensitive) in the url or data parameters to make the program understand where to inject the payload.")
         sys.exit(1)
 
     # Keep the name of the parameter that includes the keyword {payload}.
-    if(kwargs["data"]):
+    if(configuration["data"]):
         # This recursive function is used to find the parameter containing the keyword {payload} in a nested array.
         def findPayload(key, value):
             if(isinstance(value, dict)):
@@ -197,35 +136,35 @@ def main():
             return None
 
         # Set the parameter used in the request to either json, files or data depending on the content type.
-        if(kwargs["contentType"] in ("application/json","json")):
-            kwargs["postDataType"] = "json"
-        elif(kwargs["contentType"] in ("multipart/form-data","multipart","form-data")):
-            kwargs["postDataType"] = "files"
+        if(configuration["contentType"] in ("application/json","json")):
+            configuration["postDataType"] = "json"
+        elif(configuration["contentType"] in ("multipart/form-data","multipart","form-data")):
+            configuration["postDataType"] = "files"
         else:
-            kwargs["postDataType"] = "data"
+            configuration["postDataType"] = "data"
 
         # Find the parameter in which the keyword {payload} is nested.
-        if(isinstance(kwargs["data"], dict)):
-            for k,v in kwargs["data"].items():
-                kwargs["parameter"] = findPayload(k,v)
-                if(kwargs["parameter"] is not None):
+        if(isinstance(configuration["data"], dict)):
+            for k,v in configuration["data"].items():
+                configuration["parameter"] = findPayload(k,v)
+                if(configuration["parameter"] is not None):
                     break
-        if(isinstance(kwargs["data"], list)):
-            for i in range(len(kwargs["data"])):
-                kwargs["parameter"] = findPayload(i,kwargs["data"][i])
-                if(kwargs["parameter"] is not None):
+        if(isinstance(configuration["data"], list)):
+            for i in range(len(configuration["data"])):
+                configuration["parameter"] = findPayload(i,configuration["data"][i])
+                if(configuration["parameter"] is not None):
                     break
 
-        if(isinstance(kwargs["data"], str)):
+        if(isinstance(configuration["data"], str)):
             # Set the parameter to an empty string so the script knows to format the data directly as it is a string and not an array. 
-            kwargs["parameter"] = ""
+            configuration["parameter"] = ""
 
-        kwargs["data"] = {kwargs["postDataType"]: kwargs["data"]}
+        configuration["data"] = {configuration["postDataType"]: configuration["data"]}
     else:
         # Make sure that if data is not used, it's a dictionary so it can be unrolled in the request (an empty string cannot be unrolled).
-        kwargs["data"] = {}
+        configuration["data"] = {}
 
-    SQLPlease(**kwargs).doInjection()
+    SQLPlease(configuration).doInjection()
 
 class Singleton(type):
     _instances = {}
@@ -290,9 +229,8 @@ class Logger(object, metaclass=Singleton):
         self.__colorFormatter.toggleUseColor(useColor)
 
 class SQLPlease(object):
-    def __init__(self, *args, **kwargs):
-        for k, v in kwargs.items():
-            self.__dict__[k] = v
+    def __init__(self, configuration, *args, **kwargs):
+        self.__dict__.update(configuration)
 
         Logger().info(json.dumps(self.__dict__))
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
     IMPORTANT NOTE:
         Unless you know what you are doing, do not edit this script.
@@ -47,8 +47,9 @@ def main():
     #parser.add_argument("-r", "--request", dest="request", help="File containing an HTTP request to set the URL, method, data, cookies and headers. Don't forget to setup the {payload} and etc.", type=str)
     loggingParser = parser.add_argument_group("logging arguments")
     loggingParser.add_argument("-o", "--output", dest="directory", help="Directory where to put the logging file (default is 'results'.)", default="results", type=str)
-    loggingParser.add_argument("-l", "--logging-level", dest="loggingLevel", help="Default warning", choices=["debug","info","warning","error","critical"], default="info", type=str)
-    loggingParser.add_argument("-C", "--useColor", dest="useColor", help="Use color for the logging in console.", action="store_true")
+    loggingParser.add_argument("-l", "--logging-level", dest="loggingLevel", help="Default warning.", choices=["debug","info","warning","error","critical"], default="info", type=str)
+    loggingParser.add_argument("-q", "--quiet", dest="quiet", help="No console output.", action="store_true")
+    loggingParser.add_argument("--no-color", dest="noColor", help="Don't use color for the logging in console.", action="store_false")
 
     args = parser.parse_args()
 
@@ -62,8 +63,7 @@ def main():
 
             if(checksum == "67de3ea0b96684ad1c2fda8134819f96"):
                 from shutil import copyfile
-                from datetime import datetime
-                newConfigurationFile = os.path.join("configurations", '{0:%Y%m%d%H%M%S}'.format(datetime.now()) + ".py")
+                newConfigurationFile = os.path.join("configurations", '{0:%Y%m%d%H%M%S}.{ext}'.format(datetime.now(), ext="py"))
                 try:
                     copyfile(defaultConfigFilePath, newConfigurationFile)
                     print("New configuration file created: {}".format(newConfigurationFile))
@@ -83,26 +83,20 @@ def main():
         print("File does not exist: {}".format(args.configFile))
         sys.exit(0)
     
-    directory = args.directory
-    loggingLevel = args.loggingLevel
-    useColor = args.useColor
-
     configuration = getConfiguration(args.configFile)
 
     # If the variable directory is not set, the logs will be stored in ./results/
-    if(not directory):
-        directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), "results")
+    if(not args.directory):
+        args.directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), "results")
 
     # If the directory for logging does not exist, create it.
-    if(not os.path.exists(directory)):
-        os.mkdir(directory)
-    Logger(directory)
-    
-    if(useColor):
-        Logger().updateUseColor(useColor)
+    if(not os.path.exists(args.directory)):
+        os.mkdir(args.directory)
 
-    if(loggingLevel and loggingLevel.lower() in LOGGING_LEVEL):
-        Logger().updateStreamLevel(LOGGING_LEVEL[loggingLevel.lower()])
+    Logger(directory=args.directory, quiet=args.quiet, noColor=args.noColor)
+
+    if(args.loggingLevel and args.loggingLevel.lower() in LOGGING_LEVEL):
+        Logger().updateStreamLevel(LOGGING_LEVEL[args.loggingLevel.lower()])
     else:
         Logger().updateStreamLevel(LOGGING_LEVEL["info"])
 
@@ -181,23 +175,23 @@ class ColoredFormatter(logging.Formatter):
         'FATAL': 1,
     }
 
-    def __init__(self, fmt, useColor=True):
+    def __init__(self, fmt, noColor=True):
         logging.Formatter.__init__(self, fmt)
-        self.__useColor = useColor
+        self.__noColor = noColor
 
     def format(self, record):
-        if self.__useColor and record.levelname in self.COLORS:
+        if self.__noColor and record.levelname in self.COLORS:
             record.msg = "{color}{msg}{reset}".format(color=self.COLOR_SEQ.format(30 + self.COLORS[record.levelname]),msg=record.msg,reset=self.RESET_SEQ)
             record.msg = "{color}{msg}{reset}".format(color=self.COLOR_SEQ.format(30 + self.COLORS[record.levelname]),msg=record.msg,reset=self.RESET_SEQ)
 
         return logging.Formatter.format(self, record)
 
-    def toggleUseColor(self, useColor):
-        self.__useColor = useColor
+    def toggleUseColor(self, noColor):
+        self.__noColor = noColor
         
 class Logger(object, metaclass=Singleton):
-    def __init__(self, directory="results"):
-        logfilename = "{dir}/{fname}.{ext}".format(dir=directory, fname=datetime.utcnow().strftime("%Y-%m-%d_%H%M%S.%f"), ext="txt")
+    def __init__(self, directory="results", quiet=False, noColor=True):
+        logfilename = os.path.join(directory, "{fname}.{ext}".format(fname=datetime.utcnow().strftime("%Y-%m-%d_%H%M%S.%f"), ext="txt"))
         self.__logger = logging.getLogger(logfilename)
         self.__logger.setLevel(DEBUG)
 
@@ -205,14 +199,15 @@ class Logger(object, metaclass=Singleton):
         self.__fh.setLevel(DEBUG)
         self.__fh.setFormatter(logging.Formatter(fmt="[%(levelname)s] %(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
 
-        self.__colorFormatter = ColoredFormatter(fmt="%(message)s", useColor=False)
+        self.__colorFormatter = ColoredFormatter(fmt="%(message)s", noColor=noColor)
 
-        self.__sh = logging.StreamHandler()
-        self.__sh.setLevel(DEBUG)
-        self.__sh.setFormatter(self.__colorFormatter)
+        if(not quiet):
+            self.__sh = logging.StreamHandler()
+            self.__sh.setLevel(DEBUG)
+            self.__sh.setFormatter(self.__colorFormatter)
 
         self.__logger.addHandler(self.__fh)
-        self.__logger.addHandler(self.__sh)
+        if(not quiet): self.__logger.addHandler(self.__sh)
         
     def __getattr__(self, attr):
         return self.__logger.__getattribute__(attr)
@@ -220,11 +215,8 @@ class Logger(object, metaclass=Singleton):
     def updateStreamLevel(self, level):
         self.__logger.setLevel(level)
 
-    def updateUseColor(self, useColor):
-        self.__colorFormatter.toggleUseColor(useColor)
-
 class SQLPlease(object):
-    def __init__(self, configuration, *args, **kwargs):
+    def __init__(self, configuration):
         self.__dict__.update(configuration)
 
         Logger().info(json.dumps(self.__dict__))

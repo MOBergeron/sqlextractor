@@ -61,7 +61,7 @@ def main():
                 checksum = md5(f.read()).hexdigest()
                 f.close()
 
-            if(checksum == "67de3ea0b96684ad1c2fda8134819f96"):
+            if(checksum == "fcd3853879cddaba6d7b5758840d7480"):
                 from shutil import copyfile
                 newConfigurationFile = os.path.join("configurations", '{0:%Y%m%d%H%M%S}.{ext}'.format(datetime.now(), ext="py"))
                 try:
@@ -275,7 +275,6 @@ class SQLPlease(object):
                     if(self.useBinary):
                         count = self.injectionBinary()
                     else:
-
                         count = self.injectionAscii()
                     
                     Logger().info("Counted {} rows".format(count))
@@ -296,7 +295,7 @@ class SQLPlease(object):
 
                     if(self.length == ""):
                         Logger().warning("Find length failed, continue the execution without finding length.".format(self.length))
-                        del originalFindLengthPayload
+                        originalFindLengthPayload = ""
                         del self.length
                     else:
                         Logger().info("Next word of length {}".format(self.length))

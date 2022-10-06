@@ -61,7 +61,7 @@ def main():
                 checksum = md5(f.read()).hexdigest()
                 f.close()
 
-            if(checksum == "fcd3853879cddaba6d7b5758840d7480"):
+            if(checksum == "c156489218ddcb9da000585ab2a7943b"):
                 from shutil import copyfile
                 newConfigurationFile = os.path.join("configurations", '{0:%Y%m%d%H%M%S}.{ext}'.format(datetime.now(), ext="py"))
                 try:
@@ -398,7 +398,7 @@ class SQLPlease(object):
                     charIndex+=1
                     del tested
                     tested = {}
-                elif(currentAscii == minAscii):
+                elif(currentAscii == minAscii and currentAscii in tested):
                     Logger().debug("Found {} in {} requests".format(answer, amountOfRequests))
                     self.__amountOfRequests += amountOfRequests
                     return answer
